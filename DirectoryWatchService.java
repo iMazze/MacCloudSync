@@ -112,17 +112,4 @@ public abstract class DirectoryWatchService extends TimerTask{
     }
     
     protected abstract void onChange(Path file, WatchEvent.Kind kind);
- 
-    public static void main(String[] args) throws IOException {
-        Path dir = Paths.get("/Users/imazze/Google Drive/50_Software/MacCloudSync/Testarea/Ziel/");
-        
-        TimerTask ds = new DirectoryWatchService(dir){
-            protected void onChange( Path file, WatchEvent.Kind kind ) {
-                System.out.println(kind + ": " + file);
-            }
-        };
-        
-        java.util.Timer timer = new java.util.Timer();
-        timer.schedule( ds , new Date(), 1000 );
-    }
 }

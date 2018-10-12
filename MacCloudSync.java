@@ -4,6 +4,10 @@ import java.awt.event.*;
 import javax.swing.*;
 import java.util.*;
 import java.io.*;
+import java.nio.file.WatchEvent;
+
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import com.thizzer.jtouchbar.*;
 import com.thizzer.jtouchbar.item.*;
@@ -17,7 +21,7 @@ import java.util.concurrent.TimeUnit;
 
 public class MacCloudSync
 {
-    public static void main ( String[] args )
+    public static void main ( String[] args ) throws IOException
     {
         // Create new Frame
         MainFrame frm = new MainFrame("MacCloudSync V 1.0");
@@ -30,16 +34,20 @@ public class MacCloudSync
         MenuBarSupport menuBar = new MenuBarSupport(frm);
         menuBar.createMenuBar();
 
+       
+
+        
+        Path dir = Paths.get("/Users/imazze/Google Drive/50_Software/MacCloudSync/Testarea/Ziel/");
         
         
-        TimerTask task = new DirWatcher(frm.getDestinationPath()) 
-        {
-            protected void onChange( File file, String action ) {
+        TimerTask ds = new DirectoryWatchService(dir){
+            protected void onChange( Path file, WatchEvent.Kind kind ) {
                 if(!frm.syncJobEnabled){
                     return;
                 }
                 
-                System.out.println( "-> File " + file.getName() + " action: " + action );
+                //System.out.println( "-> File " + file.getName() + " action: " + action );
+                System.out.println(kind + ": " + file);
                 
                 //Change icon of MenuBar
                 menuBar.setSyncState(true, false);
@@ -54,8 +62,8 @@ public class MacCloudSync
                 menuBar.setSyncState(false, false);
             }
         };
-
+        
         java.util.Timer timer = new java.util.Timer();
-        timer.schedule( task , new Date(), 1000 );
+        timer.schedule( ds , new Date(), 1000 );
     }
 }
