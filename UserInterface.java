@@ -1,5 +1,3 @@
-
-
 public class UserInterface implements FileSyncProcessor.UserInterface {
         boolean tickerStarted;
         public void writeInfo(String s) {

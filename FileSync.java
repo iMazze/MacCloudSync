@@ -1,62 +1,94 @@
-// Copyright 2010 Christian d'Heureuse, Inventec Informatik AG, Zurich, Switzerland
-// www.source-code.biz, www.inventec.ch/chdh
-//
-// This module is multi-licensed and may be used under the terms of any of the following licenses:
-//
-//  LGPL, GNU Lesser General Public License, V2.1 or later, http://www.gnu.org/licenses/lgpl.html
-//  EPL, Eclipse Public License, V1.0 or later, http://www.eclipse.org/legal
-//
-// Please contact the author if you need another license.
-// This module is provided "as is", without warranties of any kind.
-//
-// Home page: http://www.source-code.biz/filemirrorsync
-
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import Orig.CommandLineParser;
+import java.nio.file.WatchEvent;
+
 
 // FileMirrorSync - A file mirror synchronization tool (one-way file sync, incremental file copy).
 // Driver for the command line interface.
 public class FileSync {
-
     private static Path sourcePath;
     private static Path targetPath;
     private static Options options;
-    private static boolean displayHelpOption;
-    private static int exitStatusCode;
+    
     private long lastSync = Long.MAX_VALUE;
     
+    private boolean isSyncing = false;
     
-    public int makeSync(String source, String destination, boolean syncTwoWay){
+    
+    FileSyncProcessor fsp;
+    UserInterface ui;
+        
+    // Constructor of Class FileSync
+    public FileSync(){
         options = new Options();
         //options.debugLevel = 9;
+        
+        ui = new UserInterface();
+        fsp = new FileSyncProcessor(options, ui);
+    }
+    
+    public void setSyncPath(String source, String destination){
         sourcePath = Paths.get(source);
         targetPath = Paths.get(destination);
         
+        fsp.setSyncPath(sourcePath, targetPath);
+    }
+    
+    private void checkSyncPath(){
         if (sourcePath == null) throw new CommandLineParser.CommandLineException("Missing source path parameter.");
         if (targetPath == null) throw new CommandLineParser.CommandLineException("Missing target path parameter.");
+    }
     
-        FileSyncProcessor fsp = new FileSyncProcessor();
-        UserInterface ui = new UserInterface();
+    public boolean isSyncing(){
+        return isSyncing;
+    }
+    
+    public int makeManualSync(boolean syncTwoWay){
+        isSyncing = true;
+        checkSyncPath();
+   
         Statistics statistics = new Statistics();
         
         try{
-            fsp.main(sourcePath, targetPath, options , ui, statistics, syncTwoWay, lastSync);
+            fsp.executeFullSync(statistics, syncTwoWay, lastSync);
         } 
         catch (Exception e){
-            
+            isSyncing = false;
+            return 0;
         }
         displayStatistics(statistics);
         
         
         lastSync = System.currentTimeMillis();
-        return 0;
+        isSyncing = false;
+        return 1;
+    }
+    
+    public int makeSyncAfterModify(boolean syncTwoWay, Path file, WatchEvent.Kind kind) {
+        //System.out.println("Quelle: " + sourcePath + " -> Ziel: " + targetPath + ", File: " + file);
+        isSyncing = true;
+        checkSyncPath();
+ 
+        Statistics statistics = new Statistics();
+        
+        try{
+            fsp.syncOnlyOneFile(statistics, syncTwoWay, lastSync, file, kind);
+        } 
+        catch (Exception e){
+            isSyncing = false;
+            return 0;
+        }
+        displayStatistics(statistics);
+        
+        
+        lastSync = System.currentTimeMillis();
+        isSyncing = false;
+        return 1;
     }
 
-    //--- User interface ------------------------------------------------------------------------------
-
     
-
+    //--- User interface ------------------------------------------------------------------------------
     private static void displayStatistics(Statistics statistics) {
         if (options.verbosityLevel <= 0) return;
         if (statistics.totalDiffs == 0) {

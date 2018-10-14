@@ -59,9 +59,9 @@ public class MenuBarSupport {
             {
                 public void actionPerformed(ActionEvent e) {
                     //Toggle
-                    ((MainFrame) mainFrame).syncJobEnabled = !((MainFrame) mainFrame).syncJobEnabled;
+                    ((MainFrame) mainFrame).autoSyncEnabled = !((MainFrame) mainFrame).autoSyncEnabled;
                     
-                    if(((MainFrame) mainFrame).syncJobEnabled){
+                    if(((MainFrame) mainFrame).autoSyncEnabled){
                         watcherItem.setLabel("Disable Watcher");
                         setSyncState(false, false);
                     } 

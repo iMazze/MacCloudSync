@@ -25,12 +25,15 @@ class MainFrame extends JFrame
 
     FileSync fs;
    
-    public boolean syncJobEnabled = false;
+    public boolean autoSyncEnabled = false;
 
     // constructor for ButtonFrame
-    MainFrame(String title) 
+    MainFrame(String title, FileSync fs) 
     {
-        super( title );                     // invoke the JFrame constructor
+        super( title ); 
+        this.fs = fs;
+        
+        // invoke the JFrame constructor
         setLayout( new FlowLayout() );      // set the layout manager
 
         bSyncOneWay = new JButton("Sync One Way"); 
@@ -69,7 +72,6 @@ class MainFrame extends JFrame
         add(sp);
 
         setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE); 
-        fs = new FileSync();
     }
 
     public void addTouchBar(){
@@ -121,15 +123,25 @@ class MainFrame extends JFrame
 
     private void SyncOneWay(String source, String destination){
         addLog("Sync One Way");
-        fs.makeSync(source, destination, false);
+        fs.setSyncPath(source, destination);
+        
+        // Make a one way Sync
+        fs.makeManualSync(false);
     }
 
     private void SyncTwoWay(String source, String destination){
         addLog("Sync Two Way");
-        fs.makeSync(source, destination, true);
+        fs.setSyncPath(source, destination);
+        
+        // Make a two way Sync
+        fs.makeManualSync(true);
     }
     
     public String getDestinationPath(){
         return tfDestination.getText();
+    }
+    
+    public String getSourcePath(){
+        return tfSource.getText();
     }
 }

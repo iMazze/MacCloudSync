@@ -44,4 +44,22 @@ public class SyncItem implements Comparable <SyncItem> {
         public Path getNewTargetPath() {
             return FileSyncProcessor.targetBaseDir.resolve(sourceRelativePath);
         }
+        
+        public boolean isTheSame(Path file){
+            if(sourceRelativePath != null){
+                //System.out.println(sourceRelativePath + " -- " + file);
+                if(sourceRelativePath.toString().equals(file.toString())){
+                    System.out.println("Source equals with the file");
+                    return true;
+                }
+            } else if(targetRelativePath != null){
+                //System.out.println(targetRelativePath + " -- " + file);
+                if(targetRelativePath.toString().equals(file.toString())){
+                    System.out.println("Target equals with the file");
+                    return true;
+                }
+            }
+            
+            return false;
+        }
     }

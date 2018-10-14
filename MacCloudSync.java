@@ -21,11 +21,17 @@ import java.util.concurrent.TimeUnit;
 
 public class MacCloudSync
 {
+    static FileSync fsync;
+    static final boolean useOnyOneFileForSync = false;
+    
+    
     public static void main ( String[] args ) throws IOException
     {
-        // Create new Frame
-        MainFrame frm = new MainFrame("MacCloudSync V 1.0");
-
+        fsync = new FileSync();
+        
+        
+        // Create new Frame ---------------------------------------------------------
+        MainFrame frm = new MainFrame("MacCloudSync V 1.1", fsync);
         frm.setSize( 250, 200 );
         frm.setVisible( true );
         frm.addTouchBar();
@@ -33,30 +39,28 @@ public class MacCloudSync
 
         MenuBarSupport menuBar = new MenuBarSupport(frm);
         menuBar.createMenuBar();
-
-       
-
         
-        Path dir = Paths.get("/Users/imazze/Google Drive/50_Software/MacCloudSync/Testarea/Ziel/");
-        
-        
-        TimerTask ds = new DirectoryWatchService(dir){
+        TimerTask task = new DirectoryWatchService(Paths.get(frm.getDestinationPath()))
+        {
             protected void onChange( Path file, WatchEvent.Kind kind ) {
-                if(!frm.syncJobEnabled){
+                // Do nothing if deactivated or is syncing now
+                if(!frm.autoSyncEnabled || fsync.isSyncing()){
                     return;
                 }
                 
-                //System.out.println( "-> File " + file.getName() + " action: " + action );
-                System.out.println(kind + ": " + file);
+                System.out.println("File " + file + " was " + kind);
                 
                 //Change icon of MenuBar
                 menuBar.setSyncState(true, false);
+                
                 // here we code the action on a change
-                try
-                {
-                    TimeUnit.SECONDS.sleep(3);
-                }
-                catch (Exception e){
+                fsync.setSyncPath(frm.getSourcePath(), frm.getDestinationPath());
+                
+                if(useOnyOneFileForSync){
+                    //Replace filename
+                    fsync.makeSyncAfterModify(true, Paths.get(file.toString().replace(frm.getDestinationPath(), "")), kind);
+                } else {
+                    fsync.makeManualSync(true);
                 }
                 
                 menuBar.setSyncState(false, false);
@@ -64,6 +68,6 @@ public class MacCloudSync
         };
         
         java.util.Timer timer = new java.util.Timer();
-        timer.schedule( ds , new Date(), 1000 );
+        timer.schedule( task , new Date(), 1000 );
     }
 }

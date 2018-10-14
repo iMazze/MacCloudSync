@@ -85,7 +85,10 @@ public abstract class DirectoryWatchService extends TimerTask{
             Path child = dir.resolve(name);
 
             // event on change
-            onChange(child, event.kind());
+            //if(!Files.isDirectory(child)){
+                onChange(child, event.kind());
+            //}
+            
 
             // if directory is created, and watching recursively, then register it and its sub-directories
             if (kind == ENTRY_CREATE) {

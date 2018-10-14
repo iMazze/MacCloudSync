@@ -1,16 +1,3 @@
-// Copyright 2010 Christian d'Heureuse, Inventec Informatik AG, Zurich, Switzerland
-// www.source-code.biz, www.inventec.ch/chdh
-//
-// This module is multi-licensed and may be used under the terms of any of the following licenses:
-//
-//  LGPL, GNU Lesser General Public License, V2.1 or later, http://www.gnu.org/licenses/lgpl.html
-//  EPL, Eclipse Public License, V1.0 or later, http://www.eclipse.org/legal
-//
-// Please contact the author if you need another license.
-// This module is provided "as is", without warranties of any kind.
-//
-// Home page: http://www.source-code.biz/filemirrorsync
-
 import java.io.IOException;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -27,11 +14,9 @@ import java.nio.file.StandardCopyOption;
 import java.util.Collections;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.nio.file.WatchEvent;
 
 public class FileSyncProcessor {
-
-    
-
     public static interface UserInterface {
         void writeInfo(String s);
 
@@ -44,11 +29,6 @@ public class FileSyncProcessor {
         void listItem(String relativePath, DiffStatus diffStatus);
     }
 
-    
-
-    
-
-    
 
     private static final String keyPathSeparator = "\u0000"; // path separator used for the internal key string
     private static final long oneHourInMillis = 3600000;
@@ -75,19 +55,24 @@ public class FileSyncProcessor {
     
     private long lastSync = Long.MAX_VALUE; 
 
-    //--- Main ---------------------------------------------------------------------
-
-    public void main(Path sourcePath, Path targetPath, Options options, UserInterface ui, Statistics statistics, boolean twoWaySync, long lastSync) throws Exception {
-        this.sourcePathAbs = sourcePath.toAbsolutePath().normalize();
-        this.targetPathAbs = targetPath.toAbsolutePath().normalize();
+    public FileSyncProcessor(Options options, UserInterface ui){
         this.options = options;
         this.ui = ui;
+    }
+    
+    public void setSyncPath(Path sourcePath, Path targetPath){
+        this.sourcePathAbs = sourcePath.toAbsolutePath().normalize();
+        this.targetPathAbs = targetPath.toAbsolutePath().normalize();
+    }
+    
+    //--- Main ---------------------------------------------------------------------
+    public void executeFullSync(Statistics statistics, boolean twoWaySync, long lastSync) throws Exception {  
         this.statistics = statistics;
         this.lastSync = lastSync;
         init();
         readDirectoryTrees();
         
-        System.out.println("Last Sync: " + lastSync);
+        //System.out.println("Last Sync: " + lastSync);
         
         // Comparison of the Files
         if (!compareFiles(twoWaySync)) {
@@ -105,10 +90,39 @@ public class FileSyncProcessor {
                 System.out.println("Mirroring Files");
                 mirrorFiles();
             }
+        }
+    }
+    
+    public void syncOnlyOneFile(Statistics statistics, boolean twoWaySync, long lastSync, Path file, WatchEvent.Kind kind) throws Exception {
+        this.statistics = statistics;
+        this.lastSync = lastSync;
+        init();
+        readDirectoryTrees();
+        
+        //System.out.println("Last Sync: " + lastSync);
+        
+        // Comparison of the Files
+        if (!compareFilesWithDetection(twoWaySync, file, kind)) {
+            return;
+        }
+        
+        
+        if (options.listOnly) {
+            listFiles();
+        } else {
+            if(twoWaySync){
+                System.out.println("Balancing Files");
+                mirrorFiles();
+            } 
+            else{
+                System.out.println("Mirroring Files");
+                mirrorFiles();
+            }
             
         }
     }
-
+    
+    // --- Init ----------------------
     private void init() throws Exception {
         if (!Files.exists(sourcePathAbs)) throw new Exception("The source path does not exist.");
         if (sourcePathAbs.equals(targetPathAbs)) throw new Exception("Source and target paths are equal.");
@@ -215,7 +229,7 @@ public class FileSyncProcessor {
     }
 
     private void registerSyncItem(Path path, BasicFileAttributes attrs, boolean isDirectory, boolean isSource) throws IOException {
-        //System.out.println("  Registering of: " + path.toString());
+       
         
         String relativePath = genRelativePath(path, isSource);
         if (relativePath == null) return; // ignore base directories
@@ -223,7 +237,8 @@ public class FileSyncProcessor {
         
         SyncItem item = itemMap.get(key); 
         if (item == null) { //If ANY item isnt in list
-            //System.out.println("  -> Adding item to List");
+            //System.out.println("  Registering of: " + path.toString());
+            
             item = new SyncItem();
             item.key = key;
             itemMap.put(key, item);
@@ -336,6 +351,58 @@ public class FileSyncProcessor {
         return differencesFound;
     }
     
+    private boolean compareFilesWithDetection(boolean compareTwoWay, Path file, WatchEvent.Kind kind){
+        if (options.debugLevel >= 2) ui.writeDebug("Comparing directory entries with detected Change.");
+        boolean differencesFound = false;
+  
+        // for each item
+        for (SyncItem item: itemList) {
+            //System.out.println("File: \n --> Old: " + item.getOldTargetPath() + "\n --> New: "+ item.getNewTargetPath() + "\n --> Source: "+ item.getSourcePath());
+            // TODO
+            // Changes only can be in target
+            if(compareTwoWay){
+                if(item.isTheSame(file)){
+                    System.out.println("File found!: " + file);
+                    switch(kind.name()){
+                        case "ENTRY_CREATE": 
+                            item.diffStatus = DiffStatus.addSource;
+                            break;
+                        case "ENTRY_DELETE": 
+                            item.diffStatus = DiffStatus.deleteSource;
+                            break;
+                        case "ENTRY_MODIFY": 
+                            item.diffStatus = DiffStatus.modifySource;
+                            break;
+                        default: item.diffStatus = null;
+                    }
+                    
+                    if(!item.sourceExists){
+                        //Darf nur bei Create auftreten!!!
+                        System.out.println("Source file doesnt exist!!!");
+                    }
+                } else{
+                    item.diffStatus = null;
+                }
+            }
+            else
+            {
+                // No Operation for source to do
+                item.diffStatus = null;
+            }
+            
+            if (item.diffStatus != null) {
+                differencesFound = true;
+                System.out.println("  -> " + item.key + ": " + item.diffStatus);
+            }
+        }
+        
+        if (differencesFound == false) {
+                System.out.println("File couldtn found wether in Source or Target!!");
+        }
+            
+        return differencesFound;
+    }
+    
     // Returns null if source and target are equal.
     private DiffStatus compareItem(SyncItem item) {
         if (!item.targetExists) return DiffStatus.add;
@@ -355,7 +422,7 @@ public class FileSyncProcessor {
     }
     
     private DiffStatus compareItemTwoWay(SyncItem item) {
-        System.out.println("Comparison of item for TwoWay Sync: " + item.getRelativePath());
+        //System.out.println("Comparison of item for TwoWay Sync: " + item.getRelativePath());
        
         // Deleted
         // Datei in Quelle nicht vorhanden, aber ziel vor letzten Sync erstellt -> lösche in Ziel
@@ -515,6 +582,7 @@ public class FileSyncProcessor {
         
         if(toSource){
             if (item.sourceIsDirectory) {
+                //System.out.println("Delete Directory Key: " + sourceBaseDir + "/" + item.key);
                 deleteDirectoryContents(item.key);
             } // (recoursive)
             path = item.getSourcePath();
@@ -554,6 +622,7 @@ public class FileSyncProcessor {
     // Deletes the contents of a directory.
     private void deleteDirectoryContents(String key) throws Exception {
         String keyStart = key + keyPathSeparator;
+        System.out.println("deleteDirectoryContents" + keyStart);
         while (itemListPos < itemList.size()) {
             SyncItem item = itemList.get(itemListPos);
             if (!item.key.startsWith(keyStart)) break; // end of directory reached
